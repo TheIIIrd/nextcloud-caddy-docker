@@ -1,0 +1,74 @@
+networks:
+  nextcloud_network:
+    driver: bridge
+
+services:
+  # --- Database ---
+  db:
+    image: mariadb:10.11
+    container_name: nextcloud_db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW --innodb-file-per-table=1 --skip-innodb-read-only-compressed
+    networks:
+      - nextcloud_network
+    volumes:
+      - ./db_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+
+  # --- Redis for caching and performance improvement ---
+  redis:
+    image: redis:alpine
+    container_name: nextcloud_redis
+    restart: unless-stopped
+    networks:
+      - nextcloud_network
+    volumes:
+      - ./redis_data:/data
+
+  # --- Nextcloud Primary Server ---
+  app:
+    image: nextcloud:stable-apache
+    container_name: nextcloud_app
+    restart: unless-stopped
+    networks:
+      - nextcloud_network
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nextcloud_data:/var/www/html
+      - ./nextcloud_config:/var/www/html/config
+      - ./nextcloud_custom_apps:/var/www/html/custom_apps
+    environment:
+      - MYSQL_HOST=db
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - REDIS_HOST=redis
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
+      - OVERWRITEPROTOCOL=https
+      - PHP_MEMORY_LIMIT=512M
+      - PHP_UPLOAD_LIMIT=16G
+    depends_on:
+      - db
+      - redis
+
+  # --- Caddy Reverse Proxy Server ---
+  caddy:
+    image: caddy:latest
+    container_name: nextcloud_caddy
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+      - "8081:8081"
+    networks:
+      - nextcloud_network
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    environment:
+      - DOMAIN=${NEXTCLOUD_DOMAIN}
