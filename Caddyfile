@@ -2,9 +2,6 @@
 # For the URL https://nextcloud.local:8443, Caddy will utilize an
 # automatically generated and updated, self-signed SSL certificate
 {$DOMAIN}:8443 {
-    # Automatic HTTP redirection to HTTPS
-    redir / https://{$DOMAIN}:8443{uri}
-
     # Forwarding all requests to the internal Nextcloud server
     reverse_proxy app:80
 
@@ -23,5 +20,5 @@
 
 # HTTP port for redirects
 {$DOMAIN}:8081 {
-    redir / https://{$DOMAIN}:8443{uri}
+    redir https://{$DOMAIN}:8443{uri}
 }
